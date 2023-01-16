@@ -6,7 +6,7 @@ from sklearn.preprocessing import StandardScaler
 from scipy.io.arff import loadarff
 
 
-def load_titanic():
+def load_titanic(nan_percentage=0.3):
     df_train = pd.read_csv("./titanic/train.csv")
     df_test = pd.read_csv("./titanic/test.csv")
     df = pd.concat([df_test, df_train])
@@ -14,14 +14,15 @@ def load_titanic():
     df = df[df['Survived'].notna()]
     df = df[df['Embarked'].notna()]
     df = df[df["Age"].notna()]
-    missing_values = df["Age"].values
-    df = df.drop("Age", axis=1)
+    nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
+    y_true = df["Age"].values.copy()
+    df["Age"][nan_indices] = np.nan
     le = LabelEncoder()
     df['Sex'] = le.fit_transform(df['Sex'])
     df['Embarked'] = le.fit_transform(df['Embarked'])
     scaler = StandardScaler()
     df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
-    return df, missing_values
+    return df, y_true
 
 
 def load_house_pricing():

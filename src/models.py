@@ -10,6 +10,7 @@ import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, Birch
 from scipy.spatial.distance import cdist
 from sklearn.manifold import TSNE, SpectralEmbedding, Isomap, MDS
+import scipy.spatial as sp
 
 random_state = 0
 np.random.seed(random_state)
@@ -24,32 +25,47 @@ def plot_clusters(labels, X, figname: str):
     plt.clf()
 
 
-def _cluster_data(X: np.ndarray, model_obj, model_name, min_k, max_k):
+def get_clusters(model_obj, k, clean_X, X):
+    model = model_obj(k)
+    good_labels = model.fit_predict(clean_X)
+    nan_X = X[np.isnan(X).any(axis=1)]
+    nan_columns = np.unique(np.argwhere(np.isnan(nan_X))[:, 1])
+    consine = 1 - sp.distance.cdist(np.delete(nan_X, nan_columns, 1), np.delete(clean_X, nan_columns, 1), 'cosine')
+    nan_cosine_per_label = np.zeros((k, nan_X.shape[0]))
+    for label_id in np.unique(good_labels):
+        nan_cosine_per_label[label_id] = consine[:, good_labels == label_id].mean(axis=1)
+    labels = np.zeros(X.shape[0])
+    labels[~np.isnan(X).any(axis=1)] = good_labels.copy()
+    labels[np.isnan(X).any(axis=1)] = nan_cosine_per_label.argmax(axis=0)
+    return labels, good_labels
+
+
+def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: int):
     scores = []
     possible_k = list(range(min_k, max_k))
+    clean_X = X[~np.isnan(X).any(axis=1)]
     for k in tqdm(possible_k):
-        model = model_obj(k)
-        labels = model.fit_predict(X)
-        scores.append(metrics.silhouette_score(X, labels))
+        labels, good_labels = get_clusters(model_obj, k, clean_X, X)
+        scores.append(metrics.silhouette_score(clean_X, good_labels))
+
     plt.plot(possible_k, scores)
     plt.title(f"silhouette_score over K - {model_name}")
     plt.savefig(f"{model_name}_scores.png")
     plt.clf()
     best_k = possible_k[np.argmax(scores)]
-    best_model = model_obj(best_k)
-    best_clusters = best_model.fit_predict(X)
-    plot_clusters(best_clusters, X, f"{model_name} - {best_k}")
+    best_clusters, good_labels = get_clusters(model_obj, best_k, clean_X, X)
+    plot_clusters(good_labels, clean_X, f"{model_name} - {best_k}")
     print(f"{model_name} - {best_k}, score: {np.max(scores)}")
     return best_clusters, np.max(scores)
 
 
-def cluster_data(X, min_k=10, max_k=60):
+def cluster_data(X: np.ndarray, min_k=10, max_k=20):
     possible_models = [
-        (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
-        (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
+        # (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
+        # (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
         (lambda k: AgglomerativeClustering(k), "AgglomerativeClustering"),
         # (lambda k: DBSCAN(), "DBSCAN"),
-        (lambda k: Birch(n_clusters=k), "Birch")
+        # (lambda k: Birch(n_clusters=k), "Birch")
     ]
     best_model = None
     best_score = 0
@@ -74,22 +90,18 @@ def reduce_dimension(X):
     plt.clf()
 
 
-def knn_imputer(clusters: np.ndarray, X: np.ndarray, y: np.ndarray, k=15):
-    N = y.shape[0]
-    nan_indices = np.random.uniform(size=N) < 0.3
-    y_true = y.copy()
-    y[nan_indices] = np.nan
+def knn_imputer(clusters: np.ndarray, X: np.ndarray, y_true: np.ndarray, k=15):
     scores = {}
+    missing_y = X[:, 2]
     for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
-        y_pred = imputer.fit_transform(np.hstack((X, y.reshape(-1, 1))))[:, -1]
+        y_pred = imputer.fit_transform(np.hstack((X, missing_y.reshape(-1, 1))))[:, -1]
         scores[imputer_name] = metrics.mean_squared_error(y_true, y_pred)
-    y_pred = y.copy()
+    y_pred = missing_y.copy()
     for cluster_id in tqdm(np.unique(clusters)):
         imputer = KNNImputer(n_neighbors=k, weights="uniform")
         curr_X_cluster = X[clusters == cluster_id]
-        curr_y_cluster = y[clusters == cluster_id]
+        curr_y_cluster = missing_y[clusters == cluster_id]
         curr_data = np.hstack((curr_X_cluster, curr_y_cluster.reshape(-1, 1)))
         y_pred[clusters == cluster_id] = imputer.fit_transform(curr_data)[:, -1]
     scores["CBKnn"] = metrics.mean_squared_error(y_true, y_pred)
     return scores
-
