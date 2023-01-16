@@ -1,11 +1,14 @@
-from src.preprocess import load_titanic
+from src.preprocess import load_titanic, load_data
 from src.models import cluster_data, reduce_dimension, knn_imputer
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
 if __name__ == '__main__':
+    # df, missing_values = load_data()
     df, missing_values = load_titanic()
     X = df.values
+    # plt.scatter(X[:,0], X[:, 1])
+    # plt.show()
     best_clusters = cluster_data(X)
     all_scores = defaultdict(list)
     k_range = list(range(15, 60))

@@ -39,15 +39,16 @@ def _cluster_data(X: np.ndarray, model_obj, model_name, min_k, max_k):
     best_model = model_obj(best_k)
     best_clusters = best_model.fit_predict(X)
     plot_clusters(best_clusters, X, f"{model_name} - {best_k}")
+    print(f"{model_name} - {best_k}, score: {np.max(scores)}")
     return best_clusters, np.max(scores)
 
 
 def cluster_data(X, min_k=10, max_k=60):
     possible_models = [
-        # (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
-        # (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
-        # (lambda k: AgglomerativeClustering(k), "AgglomerativeClustering"),
-        (lambda k: DBSCAN(), "DBSCAN"),
+        (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
+        (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
+        (lambda k: AgglomerativeClustering(k), "AgglomerativeClustering"),
+        # (lambda k: DBSCAN(), "DBSCAN"),
         (lambda k: Birch(n_clusters=k), "Birch")
     ]
     best_model = None

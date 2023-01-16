@@ -1,6 +1,9 @@
+import numpy as np
+
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
+from scipy.io.arff import loadarff
 
 
 def load_titanic():
@@ -33,3 +36,12 @@ def load_house_pricing():
     # X = X.drop(s[s].index, axis=1)
     X = pd.get_dummies(X, columns=categorical_cols)
     return X
+
+
+def load_data():
+    raw_data = loadarff('2d-10c.arff')
+    df = pd.DataFrame(raw_data[0])
+    df["CLASS"] = df["CLASS"].astype(np.float16)
+    missing_values = df["CLASS"].values
+    df = df.drop("CLASS", axis=1)
+    return df, missing_values
