@@ -26,7 +26,7 @@ def load_titanic(nan_percentage=0.3):
 
 
 def load_house_pricing():
-    df = pd.read_csv("house_pricing/train.csv")
+    df = pd.read_csv("more_data/house_pricing/train.csv")
     y = df["SalePrice"]
     X = df.drop(["SalePrice", "Id"], axis=1)
     # nan_count = X.isna().sum() / X.shape[0]
@@ -40,7 +40,7 @@ def load_house_pricing():
 
 
 def load_data():
-    raw_data = loadarff('2d-10c.arff')
+    raw_data = loadarff('more_data/2d-10c.arff')
     df = pd.DataFrame(raw_data[0])
     df["CLASS"] = df["CLASS"].astype(np.float16)
     missing_values = df["CLASS"].values

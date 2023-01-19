@@ -2,7 +2,6 @@ import numpy as np
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
-from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import sklearn.metrics as metrics
 import matplotlib.pyplot as plt
@@ -11,17 +10,21 @@ from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, Birch
 from scipy.spatial.distance import cdist
 from sklearn.manifold import TSNE, SpectralEmbedding, Isomap, MDS
 import scipy.spatial as sp
+import time
+from pathlib import Path
 
 random_state = 0
 np.random.seed(random_state)
 sns.set_theme()
+BASE_PATH = f'./plots/{time.strftime("%m_%d_%H_%M_%S", time.gmtime())}'
+Path(BASE_PATH).mkdir(parents=True, exist_ok=True)
 
 
 def plot_clusters(labels, X, figname: str):
     plt.figure(figsize=(10, 5))
     X_embeddings = TSNE(n_components=2).fit_transform(X)
     plt.scatter(X_embeddings[:, 0], X_embeddings[:, 1], c=labels, s=40, cmap='viridis', zorder=2)
-    plt.savefig(figname)
+    plt.savefig(f"{BASE_PATH}/{figname}")
     plt.clf()
 
 
@@ -50,7 +53,7 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
 
     plt.plot(possible_k, scores)
     plt.title(f"silhouette_score over K - {model_name}")
-    plt.savefig(f"{model_name}_scores.png")
+    plt.savefig(f"{BASE_PATH}/{model_name}_scores.png")
     plt.clf()
     best_k = possible_k[np.argmax(scores)]
     best_clusters, good_labels = get_clusters(model_obj, best_k, clean_X, X)
@@ -86,7 +89,7 @@ def reduce_dimension(X):
         axs[i].scatter(X_embedded_tsne[:, 0], X_embedded_tsne[:, 1], s=40, cmap='viridis')
         axs[i].set_title(f"{model} dimensionality reduction")
     plt.show()
-    plt.savefig("reduce_dimension.png")
+    plt.savefig(f"{BASE_PATH}/reduce_dimension.png")
     plt.clf()
 
 
