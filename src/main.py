@@ -5,7 +5,7 @@ if __name__ == '__main__':
     # df, missing_values = load_data()
     df, y_true = load_titanic(nan_percentage=0.3)
     X = df.values
-    # eval_methods_over_k(X, y_true)
+    eval_methods_over_k(X, y_true)
     scores = density_based_knn(X, y_true)
     print(scores)
     # plt.scatter(X[:,0], X[:, 1])
