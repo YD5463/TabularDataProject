@@ -52,7 +52,10 @@ def cluster_with_nan_by_cosine_sim(X, model):
         nan_cosine_per_label[label_id] = consine[:, good_labels == label_id].mean(axis=1)
     labels = np.zeros(X.shape[0])
     labels[~np.isnan(X).any(axis=1)] = good_labels.copy()
-    labels[np.isnan(X).any(axis=1)] = nan_cosine_per_label.argmax(axis=0)
+    if len(nan_cosine_per_label) != 0:
+        labels[np.isnan(X).any(axis=1)] = nan_cosine_per_label.argmax(axis=0)
+    else:
+        labels[np.isnan(X).any(axis=1)] = 0
     return labels, good_labels
 
 
@@ -76,7 +79,7 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
     return best_clusters, np.max(scores)
 
 
-def cluster_data(X: np.ndarray, min_k=10, max_k=20):
+def cluster_data(X: np.ndarray, min_k=8, max_k=11):
     possible_models = [
         (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
         (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
@@ -108,7 +111,8 @@ def reduce_dimension(X):
 
 def knn_imputer(clusters: np.ndarray, X: np.ndarray, y_true: np.ndarray, k=15):
     scores = {}
-    missing_y = X[:, 2]
+    nan_column = np.argwhere(np.any(np.isnan(X),axis=0))[0][0]
+    missing_y = X[:, nan_column] # TODO: change this
     for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
         y_pred = imputer.fit_transform(np.hstack((X, missing_y.reshape(-1, 1))))[:, -1]
         scores[imputer_name] = metrics.mean_squared_error(y_true, y_pred)
@@ -142,20 +146,27 @@ def eval_methods_over_k(X, y_true):
 
 def density_based_knn(X: np.ndarray, y_true):
     clean_X = X[~np.isnan(X).any(axis=1)]
-    # range_eps = np.linspace(0.1, 2, 20)
-    # scores = []
+    range_eps = np.linspace(0.1, 10, 20)
+    scores = []
+    min_samples = 10
     # for eps in range_eps:
-    #     model = DBSCAN(eps=eps, min_samples=5)
+    #     model = DBSCAN(eps=eps, min_samples=min_samples)
     #     labels, good_labels = cluster_with_nan_by_cosine_sim(X, model)
-    #     print(f"noisy data count: {len(good_labels[good_labels == -1])}")
+    #     noisy_data_count = len(good_labels[good_labels == -1])
+    #     if noisy_data_count == good_labels.shape[0]:
+    #         scores.append(0)
+    #         continue
+    #     print(f"noisy data count: {noisy_data_count}")
     #     score = metrics.silhouette_score(clean_X, good_labels)
     #     scores.append(score)
     # plt.plot(range_eps, scores)
-    # plt.show()
+    # plt.savefig(f"{BASE_PATH}/silhouette_score_over_eps.png")
+    # best_eps = range_eps[np.argmax(scores)]
+    # best_eps = 20
     best_model = DBSCAN(
-        eps=0.9,
+        eps=5,
         metric="euclidean",
-        min_samples=3,
+        min_samples=min_samples,
         n_jobs=-1
     )
     all_labels, labels = cluster_with_nan_by_cosine_sim(X, best_model)
@@ -176,17 +187,17 @@ def density_based_knn(X: np.ndarray, y_true):
     plt.clf()
     scores = defaultdict(list)
     k_range = list(range(10, 60))
-    for k in k_range:
+    for k in tqdm(k_range):
         max_k = 1.5 * k
         curr_densities = (densities * (max_k / densities.max()) + 1).astype(int)
-        missing_y = X[:, 2]
+        nan_column = np.argwhere(np.any(np.isnan(X), axis=0))[0][0]
+        missing_y = X[:, nan_column]
         for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
             y_pred = imputer.fit_transform(np.hstack((X, missing_y.reshape(-1, 1))))[:, -1]
             scores[imputer_name].append(metrics.mean_squared_error(y_true, y_pred))
         y_pred = missing_y.copy()
-        for cluster_id in tqdm(np.unique(all_labels)):
+        for cluster_id in np.unique(all_labels):
             cluster_k = curr_densities[int(cluster_id)] if cluster_id != -1 else 1
-            print(cluster_id, cluster_k)
             imputer = KNNImputer(n_neighbors=cluster_k, weights="uniform")
             curr_X_cluster = X[all_labels == cluster_id]
             curr_y_cluster = missing_y[all_labels == cluster_id]
@@ -197,5 +208,5 @@ def density_based_knn(X: np.ndarray, y_true):
         plt.plot(k_range, method_scores, label=method_name)
     plt.legend()
     plt.title("Method scores over K")
-    plt.savefig(f"{BASE_PATH}/methods_over_k")
+    plt.savefig(f"{BASE_PATH}/methods_over_k_density_based.png")
     return scores
