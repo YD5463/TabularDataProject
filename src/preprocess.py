@@ -4,9 +4,21 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
 from scipy.io.arff import loadarff
+from sklearn.datasets import load_digits, load_iris
 
 
-def load_titanic(nan_percentage=0.3):
+def load_mnist(nan_percentage: float):
+    MISSING_FEATURE = 28
+    df = pd.DataFrame(load_digits().data)
+    nan_indices = np.random.uniform(size=df[MISSING_FEATURE].shape[0]) < nan_percentage
+    y_true = df[MISSING_FEATURE].values.copy()
+    df[MISSING_FEATURE][nan_indices] = np.nan
+    scaler = StandardScaler()
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    return df, y_true
+
+
+def load_titanic(nan_percentage):
     df_train = pd.read_csv("./titanic/train.csv")
     df_test = pd.read_csv("./titanic/test.csv")
     df = pd.concat([df_test, df_train])
@@ -50,3 +62,23 @@ def load_data():
     missing_values = df["CLASS"].values
     df = df.drop("CLASS", axis=1)
     return df, missing_values
+
+
+# #https://www.kaggle.com/datasets/thedevastator/clustering-polygons-utilizing-iris-moon-and-circ
+# def load_galaxy(nan_percentage: float):
+#     df = pd.concat([
+#         pd.read_csv("more_data/galaxy/circles.csv"),
+#         pd.read_csv("more_data/galaxy/iris.csv"),
+#         pd.read_csv("more_data/galaxy/moon.csv")
+#     ])
+#     return df
+
+
+def load_iris_dataset(nan_percentage: float):
+    iris = load_iris()
+    df = pd.DataFrame(data=np.c_[iris['data'], iris['target']],columns=iris['feature_names'] + ['target'])
+    NAN_COLUMN = "petal width (cm)"
+    nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
+    y_true = df[NAN_COLUMN].values.copy()
+    df[NAN_COLUMN][nan_indices] = np.nan
+    return df, y_true
