@@ -14,9 +14,13 @@ def load_titanic(nan_percentage=0.3):
     df = df[df['Survived'].notna()]
     df = df[df['Embarked'].notna()]
     df = df[df["Age"].notna()]
+    # print(df["Embarked"].value_counts())
+    # mask = df["Embarked"] == 'Q'
+    # nan_indices = np.random.uniform(size=df[mask]["Age"].shape[0]) < nan_percentage
     nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
     y_true = df["Age"].values.copy()
     df["Age"][nan_indices] = np.nan
+    # df[mask][nan_indices]["Age"] = np.nan
     le = LabelEncoder()
     df['Sex'] = le.fit_transform(df['Sex'])
     df['Embarked'] = le.fit_transform(df['Embarked'])

@@ -1,4 +1,7 @@
+from collections import defaultdict
+
 import numpy as np
+from scipy.stats import gaussian_kde
 from sklearn.impute import KNNImputer, SimpleImputer
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import NearestNeighbors
@@ -13,10 +16,16 @@ import scipy.spatial as sp
 import time
 from pathlib import Path
 
+# from fcmeans import FCM
+# my_model = FCM(n_clusters=2) # we use two cluster as an example
+# my_model.fit(X) ## X, numpy array. rows:samples columns:features
+
 random_state = 0
 np.random.seed(random_state)
 sns.set_theme()
 BASE_PATH = f'./plots/{time.strftime("%m_%d_%H_%M_%S", time.gmtime())}'
+
+
 Path(BASE_PATH).mkdir(parents=True, exist_ok=True)
 
 
@@ -25,17 +34,21 @@ def plot_clusters(labels, X, figname: str):
     X_embeddings = TSNE(n_components=2).fit_transform(X)
     plt.scatter(X_embeddings[:, 0], X_embeddings[:, 1], c=labels, s=40, cmap='viridis', zorder=2)
     plt.savefig(f"{BASE_PATH}/{figname}")
+    plt.legend()
+    # plt.show()
     plt.clf()
 
 
-def get_clusters(model_obj, k, clean_X, X):
-    model = model_obj(k)
+def cluster_with_nan_by_cosine_sim(X, model):
+    clean_X = X[~np.isnan(X).any(axis=1)]
     good_labels = model.fit_predict(clean_X)
+    unique_labels = np.unique(good_labels[good_labels != -1])
+    k = len(unique_labels)
     nan_X = X[np.isnan(X).any(axis=1)]
     nan_columns = np.unique(np.argwhere(np.isnan(nan_X))[:, 1])
     consine = 1 - sp.distance.cdist(np.delete(nan_X, nan_columns, 1), np.delete(clean_X, nan_columns, 1), 'cosine')
     nan_cosine_per_label = np.zeros((k, nan_X.shape[0]))
-    for label_id in np.unique(good_labels):
+    for label_id in unique_labels:
         nan_cosine_per_label[label_id] = consine[:, good_labels == label_id].mean(axis=1)
     labels = np.zeros(X.shape[0])
     labels[~np.isnan(X).any(axis=1)] = good_labels.copy()
@@ -48,15 +61,16 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
     possible_k = list(range(min_k, max_k))
     clean_X = X[~np.isnan(X).any(axis=1)]
     for k in tqdm(possible_k):
-        labels, good_labels = get_clusters(model_obj, k, clean_X, X)
+        curr_model = model_obj(k)
+        labels, good_labels = cluster_with_nan_by_cosine_sim(X, curr_model)
         scores.append(metrics.silhouette_score(clean_X, good_labels))
-
     plt.plot(possible_k, scores)
     plt.title(f"silhouette_score over K - {model_name}")
     plt.savefig(f"{BASE_PATH}/{model_name}_scores.png")
     plt.clf()
     best_k = possible_k[np.argmax(scores)]
-    best_clusters, good_labels = get_clusters(model_obj, best_k, clean_X, X)
+    best_model = model_obj(best_k)
+    best_clusters, good_labels = cluster_with_nan_by_cosine_sim(X, best_model)
     plot_clusters(good_labels, clean_X, f"{model_name} - {best_k}")
     print(f"{model_name} - {best_k}, score: {np.max(scores)}")
     return best_clusters, np.max(scores)
@@ -64,11 +78,10 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
 
 def cluster_data(X: np.ndarray, min_k=10, max_k=20):
     possible_models = [
-        # (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
-        # (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
+        (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
+        (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
         (lambda k: AgglomerativeClustering(k), "AgglomerativeClustering"),
-        # (lambda k: DBSCAN(), "DBSCAN"),
-        # (lambda k: Birch(n_clusters=k), "Birch")
+        (lambda k: Birch(n_clusters=k), "Birch")
     ]
     best_model = None
     best_score = 0
@@ -107,4 +120,82 @@ def knn_imputer(clusters: np.ndarray, X: np.ndarray, y_true: np.ndarray, k=15):
         curr_data = np.hstack((curr_X_cluster, curr_y_cluster.reshape(-1, 1)))
         y_pred[clusters == cluster_id] = imputer.fit_transform(curr_data)[:, -1]
     scores["CBKnn"] = metrics.mean_squared_error(y_true, y_pred)
+    return scores
+
+
+def eval_methods_over_k(X, y_true):
+    best_clusters = cluster_data(X)
+    all_scores = defaultdict(list)
+    k_range = list(range(15, 60))
+
+    for k in k_range:
+        scores = knn_imputer(best_clusters, X, y_true.copy(), k)
+        for key, value in scores.items():
+            all_scores[key].append(value)
+    for method_name, scores in all_scores.items():
+        plt.plot(k_range, scores, label=method_name)
+    plt.legend()
+    plt.title("Method scores over K")
+    plt.savefig(f"{BASE_PATH}/methods_over_k")
+    # plt.show()
+
+
+def density_based_knn(X: np.ndarray, y_true):
+    clean_X = X[~np.isnan(X).any(axis=1)]
+    # range_eps = np.linspace(0.1, 2, 20)
+    # scores = []
+    # for eps in range_eps:
+    #     model = DBSCAN(eps=eps, min_samples=5)
+    #     labels, good_labels = cluster_with_nan_by_cosine_sim(X, model)
+    #     print(f"noisy data count: {len(good_labels[good_labels == -1])}")
+    #     score = metrics.silhouette_score(clean_X, good_labels)
+    #     scores.append(score)
+    # plt.plot(range_eps, scores)
+    # plt.show()
+    best_model = DBSCAN(
+        eps=0.9,
+        metric="euclidean",
+        min_samples=3,
+        n_jobs=-1
+    )
+    all_labels, labels = cluster_with_nan_by_cosine_sim(X, best_model)
+    print(f"noisy data count: {len(labels[labels == -1])}")
+    plot_clusters(labels, clean_X, "DBSCAN")
+    clusters_ids, counts = np.unique(labels, return_counts=True)
+    densities = []
+    for label, count in zip(clusters_ids, counts):
+        if label == -1:
+            continue
+        points = clean_X[labels == label]
+        volume = (points.max(axis=0) - points.min(axis=0) + 0.0001).prod()
+        density = count / volume
+        densities.append(density)
+    densities = 1 / np.array(densities)
+    plt.bar(list(range(len(densities))),densities)
+    plt.savefig(f"{BASE_PATH}/k_weights_by_cluster_id.png")
+    plt.clf()
+    scores = defaultdict(list)
+    k_range = list(range(10, 60))
+    for k in k_range:
+        max_k = 1.5 * k
+        curr_densities = (densities * (max_k / densities.max()) + 1).astype(int)
+        missing_y = X[:, 2]
+        for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
+            y_pred = imputer.fit_transform(np.hstack((X, missing_y.reshape(-1, 1))))[:, -1]
+            scores[imputer_name].append(metrics.mean_squared_error(y_true, y_pred))
+        y_pred = missing_y.copy()
+        for cluster_id in tqdm(np.unique(all_labels)):
+            cluster_k = curr_densities[int(cluster_id)] if cluster_id != -1 else 1
+            print(cluster_id, cluster_k)
+            imputer = KNNImputer(n_neighbors=cluster_k, weights="uniform")
+            curr_X_cluster = X[all_labels == cluster_id]
+            curr_y_cluster = missing_y[all_labels == cluster_id]
+            curr_data = np.hstack((curr_X_cluster, curr_y_cluster.reshape(-1, 1)))
+            y_pred[all_labels == cluster_id] = imputer.fit_transform(curr_data)[:, -1]
+        scores["CBKnn"].append(metrics.mean_squared_error(y_true, y_pred))
+    for method_name, method_scores in scores.items():
+        plt.plot(k_range, method_scores, label=method_name)
+    plt.legend()
+    plt.title("Method scores over K")
+    plt.savefig(f"{BASE_PATH}/methods_over_k")
     return scores
