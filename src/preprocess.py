@@ -3,8 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
-from scipy.io.arff import loadarff
-from sklearn.datasets import load_digits, load_iris
+from sklearn.datasets import load_digits
 
 
 def load_mnist(nan_percentage: float):
@@ -40,54 +39,9 @@ def load_titanic(nan_percentage):
     return df, y_true
 
 
-def load_house_pricing(nan_percentage: float):
-    df = pd.read_csv("more_data/house_pricing/train.csv")
-    y = df["SalePrice"]
-    X = df.drop(["SalePrice", "Id"], axis=1)
-    # nan_count = X.isna().sum() / X.shape[0]
-    # np.percentile(nan_count,95)
-    # X = X[X.columns[nan_count < 0.9]]
-    very_num_cols = X._get_numeric_data().columns
-    categorical_cols = list(set(X.columns) - set(very_num_cols))
-    # X = X.drop(s[s].index, axis=1)
-    X = pd.get_dummies(X, columns=categorical_cols)
-    return X
-
-
-def load_data():
-    raw_data = loadarff('more_data/2d-10c.arff')
-    df = pd.DataFrame(raw_data[0])
-    df["CLASS"] = df["CLASS"].astype(np.float16)
-    missing_values = df["CLASS"].values
-    df = df.drop("CLASS", axis=1)
-    return df, missing_values
-
-
-#https://www.kaggle.com/datasets/thedevastator/clustering-polygons-utilizing-iris-moon-and-circ
-def load_galaxy(nan_percentage: float):
-    df = pd.concat([
-        pd.read_csv("more_data/galaxy/circles.csv"),
-        pd.read_csv("more_data/galaxy/iris.csv"),
-        pd.read_csv("more_data/galaxy/moon.csv")
-    ])
-    return df
-
-
-def load_iris_dataset(nan_percentage: float):
-    iris = load_iris()
-    df = pd.DataFrame(data=np.c_[iris['data'], iris['target']], columns=iris['feature_names'] + ['target'])
-    NAN_COLUMN = "petal width (cm)"
-    nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
-    y_true = df[NAN_COLUMN].values.copy()
-    df[NAN_COLUMN][nan_indices] = np.nan
-    scaler = StandardScaler()
-    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
-    return df, y_true
-
-
 def load_mobile_price_dataset(nan_percentage: float):
-    df = pd.concat([pd.read_csv("./more_data/mobile_price/test.csv"),
-                    pd.read_csv("./more_data/mobile_price/train.csv")])
+    df = pd.concat([pd.read_csv("./datasets/mobile_price/test.csv"),
+                    pd.read_csv("./datasets/mobile_price/train.csv")])
     df = df.drop(["id"],axis=1)
     df = df[df["price_range"].notna()]
     NAN_COLUMN = "battery_power"
