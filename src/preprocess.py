@@ -8,7 +8,7 @@ from sklearn.datasets import load_digits, load_iris
 
 
 def load_mnist(nan_percentage: float):
-    MISSING_FEATURE = 28
+    MISSING_FEATURE = 35
     df = pd.DataFrame(load_digits().data)
     nan_indices = np.random.uniform(size=df[MISSING_FEATURE].shape[0]) < nan_percentage
     y_true = df[MISSING_FEATURE].values.copy()
@@ -26,13 +26,12 @@ def load_titanic(nan_percentage):
     df = df[df['Survived'].notna()]
     df = df[df['Embarked'].notna()]
     df = df[df["Age"].notna()]
-    # print(df["Embarked"].value_counts())
-    # mask = df["Embarked"] == 'Q'
-    # nan_indices = np.random.uniform(size=df[mask]["Age"].shape[0]) < nan_percentage
-    nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
+    print(df["Embarked"].value_counts())
+    # nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
     y_true = df["Age"].values.copy()
-    df["Age"][nan_indices] = np.nan
-    # df[mask][nan_indices]["Age"] = np.nan
+    # df["Age"][nan_indices] = np.nan
+    nan_mask = np.random.uniform(size=df["Embarked"].shape[0]) < 0.8
+    df["Age"][(df["Embarked"] == 'C') & nan_mask] = np.nan
     le = LabelEncoder()
     df['Sex'] = le.fit_transform(df['Sex'])
     df['Embarked'] = le.fit_transform(df['Embarked'])
@@ -41,7 +40,7 @@ def load_titanic(nan_percentage):
     return df, y_true
 
 
-def load_house_pricing():
+def load_house_pricing(nan_percentage: float):
     df = pd.read_csv("more_data/house_pricing/train.csv")
     y = df["SalePrice"]
     X = df.drop(["SalePrice", "Id"], axis=1)
@@ -64,21 +63,37 @@ def load_data():
     return df, missing_values
 
 
-# #https://www.kaggle.com/datasets/thedevastator/clustering-polygons-utilizing-iris-moon-and-circ
-# def load_galaxy(nan_percentage: float):
-#     df = pd.concat([
-#         pd.read_csv("more_data/galaxy/circles.csv"),
-#         pd.read_csv("more_data/galaxy/iris.csv"),
-#         pd.read_csv("more_data/galaxy/moon.csv")
-#     ])
-#     return df
+#https://www.kaggle.com/datasets/thedevastator/clustering-polygons-utilizing-iris-moon-and-circ
+def load_galaxy(nan_percentage: float):
+    df = pd.concat([
+        pd.read_csv("more_data/galaxy/circles.csv"),
+        pd.read_csv("more_data/galaxy/iris.csv"),
+        pd.read_csv("more_data/galaxy/moon.csv")
+    ])
+    return df
 
 
 def load_iris_dataset(nan_percentage: float):
     iris = load_iris()
-    df = pd.DataFrame(data=np.c_[iris['data'], iris['target']],columns=iris['feature_names'] + ['target'])
+    df = pd.DataFrame(data=np.c_[iris['data'], iris['target']], columns=iris['feature_names'] + ['target'])
     NAN_COLUMN = "petal width (cm)"
     nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
     y_true = df[NAN_COLUMN].values.copy()
     df[NAN_COLUMN][nan_indices] = np.nan
+    scaler = StandardScaler()
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    return df, y_true
+
+
+def load_mobile_price_dataset(nan_percentage: float):
+    df = pd.concat([pd.read_csv("./more_data/mobile_price/test.csv"),
+                    pd.read_csv("./more_data/mobile_price/train.csv")])
+    df = df.drop(["id"],axis=1)
+    df = df[df["price_range"].notna()]
+    NAN_COLUMN = "battery_power"
+    nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
+    y_true = df[NAN_COLUMN].values.copy()
+    df[NAN_COLUMN][nan_indices] = np.nan
+    scaler = StandardScaler()
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
     return df, y_true

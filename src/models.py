@@ -10,7 +10,6 @@ import sklearn.metrics as metrics
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, Birch
-from scipy.spatial.distance import cdist
 from sklearn.manifold import TSNE, SpectralEmbedding, Isomap, MDS
 import scipy.spatial as sp
 import time
@@ -33,6 +32,7 @@ def plot_clusters(labels, X, figname: str):
     plt.figure(figsize=(10, 5))
     X_embeddings = TSNE(n_components=2).fit_transform(X)
     plt.scatter(X_embeddings[:, 0], X_embeddings[:, 1], c=labels, s=40, cmap='viridis', zorder=2)
+    plt.title("Cluster Visualization using TSNE")
     plt.savefig(f"{BASE_PATH}/{figname}")
     plt.legend()
     # plt.show()
@@ -70,6 +70,8 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
     plt.plot(possible_k, scores)
     plt.title(f"silhouette_score over K - {model_name}")
     plt.savefig(f"{BASE_PATH}/{model_name}_scores.png")
+    plt.xlabel("K over time")
+    plt.ylabel("Silhouette Score")
     plt.clf()
     best_k = possible_k[np.argmax(scores)]
     best_model = model_obj(best_k)
@@ -79,7 +81,7 @@ def _cluster_data(X: np.ndarray, model_obj, model_name: str, min_k: int, max_k: 
     return best_clusters, np.max(scores)
 
 
-def cluster_data(X: np.ndarray, min_k=8, max_k=11):
+def cluster_data(X: np.ndarray, min_k=3, max_k=40):
     possible_models = [
         (lambda k: KMeans(k, n_init="auto", random_state=random_state), "Kmean"),
         (lambda k: GaussianMixture(k, max_iter=3000), "GaussianMixture"),
@@ -111,8 +113,8 @@ def reduce_dimension(X):
 
 def knn_imputer(clusters: np.ndarray, X: np.ndarray, y_true: np.ndarray, k=15):
     scores = {}
-    nan_column = np.argwhere(np.any(np.isnan(X),axis=0))[0][0]
-    missing_y = X[:, nan_column] # TODO: change this
+    nan_column = np.argwhere(np.any(np.isnan(X), axis=0))[0][0]
+    missing_y = X[:, nan_column]
     for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
         y_pred = imputer.fit_transform(np.hstack((X, missing_y.reshape(-1, 1))))[:, -1]
         scores[imputer_name] = metrics.mean_squared_error(y_true, y_pred)
@@ -139,16 +141,18 @@ def eval_methods_over_k(X, y_true):
     for method_name, scores in all_scores.items():
         plt.plot(k_range, scores, label=method_name)
     plt.legend()
+    plt.xlabel("Number Of Neighborhood")
+    plt.ylabel("Mean Squared Error")
     plt.title("Method scores over K")
     plt.savefig(f"{BASE_PATH}/methods_over_k")
     # plt.show()
 
 
 def density_based_knn(X: np.ndarray, y_true):
+    min_samples = 2
     clean_X = X[~np.isnan(X).any(axis=1)]
-    range_eps = np.linspace(0.1, 10, 20)
-    scores = []
-    min_samples = 10
+    # range_eps = np.linspace(0.1, 10, 20)
+    # scores = []
     # for eps in range_eps:
     #     model = DBSCAN(eps=eps, min_samples=min_samples)
     #     labels, good_labels = cluster_with_nan_by_cosine_sim(X, model)
@@ -156,15 +160,14 @@ def density_based_knn(X: np.ndarray, y_true):
     #     if noisy_data_count == good_labels.shape[0]:
     #         scores.append(0)
     #         continue
-    #     print(f"noisy data count: {noisy_data_count}")
+    #     print(f"noisy data count with eps={eps}: {noisy_data_count}")
     #     score = metrics.silhouette_score(clean_X, good_labels)
     #     scores.append(score)
     # plt.plot(range_eps, scores)
     # plt.savefig(f"{BASE_PATH}/silhouette_score_over_eps.png")
-    # best_eps = range_eps[np.argmax(scores)]
-    # best_eps = 20
+    best_eps = 3#range_eps[np.argmax(scores)]
     best_model = DBSCAN(
-        eps=5,
+        eps=best_eps,
         metric="euclidean",
         min_samples=min_samples,
         n_jobs=-1
@@ -181,15 +184,19 @@ def density_based_knn(X: np.ndarray, y_true):
         volume = (points.max(axis=0) - points.min(axis=0) + 0.0001).prod()
         density = count / volume
         densities.append(density)
-    densities = 1 / np.array(densities)
+    densities = np.array(densities)
     plt.bar(list(range(len(densities))),densities)
+    plt.xlabel("cluster id")
+    plt.ylabel("weight of k")
     plt.savefig(f"{BASE_PATH}/k_weights_by_cluster_id.png")
     plt.clf()
     scores = defaultdict(list)
     k_range = list(range(10, 60))
     for k in tqdm(k_range):
-        max_k = 1.5 * k
-        curr_densities = (densities * (max_k / densities.max()) + 1).astype(int)
+        min_k = 0.1 * k
+        max_k = k
+        curr_densities = (((densities - densities.min()) * (max_k - min_k))/ (densities.max() - densities.min()) + min_k).astype(int) + 1
+        print(curr_densities, k)
         nan_column = np.argwhere(np.any(np.isnan(X), axis=0))[0][0]
         missing_y = X[:, nan_column]
         for imputer, imputer_name in [(KNNImputer(n_neighbors=k, weights="uniform"), "KNNImputer")]:
@@ -208,5 +215,7 @@ def density_based_knn(X: np.ndarray, y_true):
         plt.plot(k_range, method_scores, label=method_name)
     plt.legend()
     plt.title("Method scores over K")
+    plt.xlabel("Number Of Neighborhood")
+    plt.ylabel("Mean Squared Error")
     plt.savefig(f"{BASE_PATH}/methods_over_k_density_based.png")
     return scores
