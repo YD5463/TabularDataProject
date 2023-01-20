@@ -17,20 +17,22 @@ def load_mnist(nan_percentage: float):
     return df, y_true
 
 
-def load_titanic(nan_percentage):
-    df_train = pd.read_csv("./titanic/train.csv")
-    df_test = pd.read_csv("./titanic/test.csv")
+def load_titanic(nan_percentage: float, uniform_nan: bool = True):
+    df_train = pd.read_csv("./datasets/titanic/train.csv")
+    df_test = pd.read_csv("./datasets/titanic/test.csv")
     df = pd.concat([df_test, df_train])
     df = df.drop(['PassengerId', 'Name', 'Cabin', 'Ticket'], axis=1)
     df = df[df['Survived'].notna()]
     df = df[df['Embarked'].notna()]
     df = df[df["Age"].notna()]
     print(df["Embarked"].value_counts())
-    # nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
     y_true = df["Age"].values.copy()
-    # df["Age"][nan_indices] = np.nan
-    nan_mask = np.random.uniform(size=df["Embarked"].shape[0]) < 0.8
-    df["Age"][(df["Embarked"] == 'C') & nan_mask] = np.nan
+    if uniform_nan:
+        nan_indices = np.random.uniform(size=df["Age"].shape[0]) < nan_percentage
+        df["Age"][nan_indices] = np.nan
+    else:
+        nan_mask = np.random.uniform(size=df["Embarked"].shape[0]) < 0.8
+        df["Age"][(df["Embarked"] == 'C') & nan_mask] = np.nan
     le = LabelEncoder()
     df['Sex'] = le.fit_transform(df['Sex'])
     df['Embarked'] = le.fit_transform(df['Embarked'])
