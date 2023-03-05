@@ -11,12 +11,6 @@ import seaborn as sns
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, Birch
 from sklearn.manifold import TSNE, SpectralEmbedding, Isomap, MDS
 import scipy.spatial as sp
-import time
-from pathlib import Path
-
-# from fcmeans import FCM
-# my_model = FCM(n_clusters=2) # we use two cluster as an example
-# my_model.fit(X) ## X, numpy array. rows:samples columns:features
 
 random_state = 0
 np.random.seed(random_state)
@@ -175,7 +169,8 @@ def get_best_dbscan_params(clean_X: np.ndarray, min_samples: int):
         print(f"noisy data count with eps={eps}: {noisy_data_count}")
         try:
             score = metrics.silhouette_score(clean_X, good_labels)
-        except:
+        except Exception as e:
+            print(e)
             score = 0
         scores.append(score)
     plt.plot(range_eps, scores)

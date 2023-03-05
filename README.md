@@ -1,4 +1,5 @@
 # Cluster Based Knn Imputation
+see all the results and experiments [here](https://github.com/YD5463/TabularDataProject/blob/master/main.ipynb)
 
 Filling null values in data observation is one of the major steps in data science pipeline. This is even more crucial for cases where there have small datasets. In our research we focus on the KNN imputation method, but instead to determine for each sample the same k, we use clustering method to adapt for each of the samples with nan value the cluster which he most probably from there and run the KNN on this and only this neighbours. we run our method on multiple datasets and we found that our method improve the results in cases where the percentage of null values is high.
 

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.preprocessing import StandardScaler
-from sklearn.datasets import load_digits
+from sklearn.datasets import load_digits, load_iris
 
 
 def load_mnist(nan_percentage: float):
@@ -44,9 +44,22 @@ def load_titanic(nan_percentage: float, uniform_nan: bool = True):
 def load_mobile_price_dataset(nan_percentage: float):
     df = pd.concat([pd.read_csv("./datasets/mobile_price/test.csv"),
                     pd.read_csv("./datasets/mobile_price/train.csv")])
-    df = df.drop(["id"],axis=1)
+    df = df.drop(["id"], axis=1)
     df = df[df["price_range"].notna()]
     NAN_COLUMN = "battery_power"
+    nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
+    y_true = df[NAN_COLUMN].values.copy()
+    df[NAN_COLUMN][nan_indices] = np.nan
+    scaler = StandardScaler()
+    df = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+    return df, y_true
+
+
+def load_iris_dataset(nan_percentage: float):
+    iris = load_iris()
+    df = pd.DataFrame(data=np.c_[iris['data'], iris['target']],
+                      columns=iris['feature_names'] + ['target'])
+    NAN_COLUMN = "petal width (cm)"
     nan_indices = np.random.uniform(size=df[NAN_COLUMN].shape[0]) < nan_percentage
     y_true = df[NAN_COLUMN].values.copy()
     df[NAN_COLUMN][nan_indices] = np.nan
